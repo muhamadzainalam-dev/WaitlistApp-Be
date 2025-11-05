@@ -1,16 +1,20 @@
 const express = require("express");
 const cors = require("cors");
-const { Resend } = require("resend");
+const SibApiV3Sdk = require("@sendinblue/client");
 require("dotenv").config();
 
 const app = express();
 app.use(express.json());
 app.use(cors());
-
 const port = process.env.PORT || 8000;
-const resend = new Resend(process.env.RESEND_API_KEY);
 
-// Send Notification Emails
+// Initialize Brevo API
+const brevo = new SibApiV3Sdk.TransactionalEmailsApi();
+brevo.setApiKey(
+  SibApiV3Sdk.TransactionalEmailsApiApiKeys.apiKey,
+  process.env.BREVO_API_KEY
+);
+
 app.post("/mail", async (req, res) => {
   const { email } = req.body;
 
@@ -18,6 +22,7 @@ app.post("/mail", async (req, res) => {
     return res.status(400).json({ success: false, error: "Email is required" });
   }
 
+  const userName = "there";
   const subject = "Welcome to LOTA AI!";
   const message =
     "Thanks for joining the LOTA AI community! Soon you’ll be able to manage your daily tasks just by speaking — alarms, reminders, and smart actions handled automatically.";
@@ -25,24 +30,29 @@ app.post("/mail", async (req, res) => {
   const htmlTemplate = `
   <div style="font-family: 'Segoe UI', Tahoma, sans-serif; background-color: #f4f7fb; padding: 25px;">
     <div style="max-width: 600px; background: #ffffff; border-radius: 12px; overflow: hidden; margin: auto; box-shadow: 0 4px 10px rgba(0,0,0,0.1);">
+
       <div style="background-color: #0ea5e9; color: white; padding: 25px; text-align: center;">
         <h1 style="margin: 0; font-size: 26px;">🤖 LOTA AI</h1>
         <p style="margin: 5px 0 0; font-size: 15px;">Your Smart Personal Agent</p>
       </div>
+
       <div style="padding: 35px 25px;">
-        <h2 style="color: #333;">Hey there 👋</h2>
+        <h2 style="color: #333;">Hey ${userName} 👋</h2>
         <p style="color: #555; font-size: 16px; line-height: 1.7;">
           ${message}
         </p>
+
         <div style="margin: 35px 0; text-align: center;">
           <a href="https://lotaai.vercel.app" target="_blank" style="display: inline-block; background-color: #0ea5e9; color: white; padding: 12px 28px; border-radius: 8px; text-decoration: none; font-weight: bold;">
             Visit LOTA AI
           </a>
         </div>
+
         <p style="color: #666; font-size: 14px; text-align: center;">
           Stay tuned! We'll notify you as soon as LOTA AI launches 🚀
         </p>
       </div>
+
       <div style="background-color: #f1f5f9; color: #888; text-align: center; padding: 15px; font-size: 13px;">
         © ${new Date().getFullYear()} LOTA AI — All Rights Reserved.
       </div>
@@ -51,20 +61,20 @@ app.post("/mail", async (req, res) => {
   `;
 
   try {
-    // Send Welcome Email To User
-    await resend.emails.send({
-      from: `LOTA AI <${process.env.FROM_EMAIL}>`,
-      to: email,
+    // Send email to user
+    await brevo.sendTransacEmail({
+      sender: { email: process.env.FROM_EMAIL, name: "LOTA AI Team" },
+      to: [{ email }],
       subject,
-      html: htmlTemplate,
+      htmlContent: htmlTemplate,
     });
 
-    // Send Notification To Admin
-    await resend.emails.send({
-      from: `LOTA AI Bot <${process.env.FROM_EMAIL}>`,
-      to: process.env.ADMIN_EMAIL,
+    // Send notification to admin
+    await brevo.sendTransacEmail({
+      sender: { email: process.env.FROM_EMAIL, name: "LOTA AI Bot" },
+      to: [{ email: process.env.ADMIN_EMAIL }],
       subject: "📩 New LOTA AI Subscriber!",
-      html: `
+      htmlContent: `
         <div style="font-family: Arial, sans-serif;">
           <h2>📥 New LOTA AI Signup</h2>
           <p><strong>Email:</strong> ${email}</p>
@@ -73,17 +83,18 @@ app.post("/mail", async (req, res) => {
       `,
     });
 
-    console.log(`Emails sent: user=${email}, admin=${process.env.ADMIN_EMAIL}`);
+    console.log(
+      `✅ Emails sent successfully: user=${email}, admin=${process.env.ADMIN_EMAIL}`
+    );
     res
       .status(200)
       .json({ success: true, message: "Emails sent successfully" });
-  } catch (error) {
-    console.error(" Error sending email:", error);
+  } catch (err) {
+    console.error("❌ Error while sending mail:", err);
     res.status(500).json({ success: false, error: "Failed to send email" });
   }
 });
 
-// START SERVER
 app.listen(port, () => {
   console.log(`🚀 Server running on port ${port}`);
 });
