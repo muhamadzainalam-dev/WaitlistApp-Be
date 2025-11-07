@@ -50,15 +50,24 @@ app.post("/mail", async (req, res) => {
   }
 
   // Save Email To Google Sheets
-  await fetch(
-    "https://script.google.com/macros/s/AKfycbzc4FwSKgUlM4UM2bzWa33JxbaSAzbH-HxuAPln1lqioO6qZk_dE9HzroeYoXSLX6Vcsw/exec",
-    {
-      method: "POST",
-      mode: "no-cors",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email }),
+  try {
+    const response = await fetch(
+      "https://script.google.com/macros/s/AKfycbzc4FwSKgUlM4UM2bzWa33JxbaSAzbH-HxuAPln1lqioO6qZk_dE9HzroeYoXSLX6Vcsw/exec",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`Google Sheets API error: ${response.statusText}`);
     }
-  );
+
+    console.log("Email saved to Google Sheets successfully");
+  } catch (error) {
+    console.error("Error saving to Google Sheets:", error.message);
+  }
 
   // Step 2: Prepare email
   const userName = "there";
