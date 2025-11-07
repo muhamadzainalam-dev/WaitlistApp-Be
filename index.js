@@ -49,6 +49,17 @@ app.post("/mail", async (req, res) => {
     });
   }
 
+  // Save Email To Google Sheets
+  await fetch(
+    "https://script.google.com/macros/s/AKfycbzc4FwSKgUlM4UM2bzWa33JxbaSAzbH-HxuAPln1lqioO6qZk_dE9HzroeYoXSLX6Vcsw/exec",
+    {
+      method: "POST",
+      mode: "no-cors",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email }),
+    }
+  );
+
   // Step 2: Prepare email
   const userName = "there";
   const subject = "Welcome to LOTA AI!";
