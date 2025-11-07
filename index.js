@@ -8,12 +8,30 @@ app.use(express.json());
 app.use(cors());
 const port = process.env.PORT || 8000;
 
-// Initialize Brevo API
+// Initialize Brevo (Sendinblue) API
 const brevo = new SibApiV3Sdk.TransactionalEmailsApi();
 brevo.setApiKey(
   SibApiV3Sdk.TransactionalEmailsApiApiKeys.apiKey,
   process.env.BREVO_API_KEY
 );
+
+// Helper function to verify email using Abstract API
+async function verifyEmail(email) {
+  try {
+    const response = await fetch(
+      `https://emailreputation.abstractapi.com/v1/?api_key=${process.env.ABSTRACT_API_KEY}&email=${email}`
+    );
+
+    const data = await response.json();
+    console.log("📬 Email verification result:", data);
+
+    // Accept only valid, deliverable emails
+    return data.email_deliverability.status_detail === "valid_email";
+  } catch (error) {
+    console.error("Error verifying email:", error.message);
+    return false;
+  }
+}
 
 app.post("/mail", async (req, res) => {
   const { email } = req.body;
@@ -22,6 +40,16 @@ app.post("/mail", async (req, res) => {
     return res.status(400).json({ success: false, error: "Email is required" });
   }
 
+  // Step 1: Verify email
+  const isValid = await verifyEmail(email);
+  if (!isValid) {
+    return res.status(400).json({
+      success: false,
+      error: "Invalid or undeliverable email address",
+    });
+  }
+
+  // Step 2: Prepare email
   const userName = "there";
   const subject = "Welcome to LOTA AI!";
   const message =
@@ -61,7 +89,7 @@ app.post("/mail", async (req, res) => {
   `;
 
   try {
-    // Send email to user
+    // Send welcome email
     await brevo.sendTransacEmail({
       sender: { email: process.env.FROM_EMAIL, name: "LOTA AI Team" },
       to: [{ email }],
@@ -69,7 +97,7 @@ app.post("/mail", async (req, res) => {
       htmlContent: htmlTemplate,
     });
 
-    // Send notification to admin
+    // Send admin notification
     await brevo.sendTransacEmail({
       sender: { email: process.env.FROM_EMAIL, name: "LOTA AI Bot" },
       to: [{ email: process.env.ADMIN_EMAIL }],
@@ -84,17 +112,17 @@ app.post("/mail", async (req, res) => {
     });
 
     console.log(
-      `✅ Emails sent successfully: user=${email}, admin=${process.env.ADMIN_EMAIL}`
+      `Emails sent successfully: user=${email}, admin=${process.env.ADMIN_EMAIL}`
     );
     res
       .status(200)
       .json({ success: true, message: "Emails sent successfully" });
   } catch (err) {
-    console.error("❌ Error while sending mail:", err);
+    console.error("Error while sending mail:", err);
     res.status(500).json({ success: false, error: "Failed to send email" });
   }
 });
 
 app.listen(port, () => {
-  console.log(`🚀 Server running on port ${port}`);
+  console.log(`Server running on port ${port}`);
 });
